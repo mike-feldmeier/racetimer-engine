@@ -13,10 +13,7 @@ var state = {
 			lngm: 0
 		}
 	},
-	profile: {
-		name: null,
-		data: {}
-	}
+	profile: null
 };
 
 module.exports = state;

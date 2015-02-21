@@ -39,4 +39,8 @@ io.on('connection', function(socket) {
 	socket.on('profile-header', function(data) {
 		engine.saveProfileHeader(data);
 	});
+
+	socket.on('select-profile', function(data) {
+		engine.selectProfile(data.id);
+	});
 });

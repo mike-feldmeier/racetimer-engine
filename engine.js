@@ -28,8 +28,8 @@ gps.on('disconnected', function(data) {
 
 gps.on('TPV', function(data) {
 	if(moment(data.time) - 0 !== state.gps.time) {
-		var lat = parseFloat(data.lat.toFixed(LAT_LONG_PLACES));
-		var lng = parseFloat(data.lon.toFixed(LAT_LONG_PLACES));
+		var lat = parseFloat((data.lat ? data.lat : 0).toFixed(LAT_LONG_PLACES));
+		var lng = parseFloat((data.lon ? data.lon : 0).toFixed(LAT_LONG_PLACES));
 
 		if(state.race.startsAt) {
 			var now = moment(data.time) - 0;
@@ -87,6 +87,13 @@ function getProfile(id) {
 	});
 }
 
+function selectProfile(id) {
+	Profile.findById(id, function(err, profile) {
+		if(err) throw err;
+		state.profile = profile;
+	});
+}
+
 function saveProfileHeader(header) {
 	var profile = new Profile();
 
@@ -114,6 +121,7 @@ module.exports = {
 	listProfiles: listProfiles,
 	saveProfileHeader: saveProfileHeader,
 	getProfile: getProfile,
+	selectProfile: selectProfile,
 
 	on: function(key, f) { eventEmitter.on(key, f); }
 };
