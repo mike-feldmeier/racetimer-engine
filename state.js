@@ -1,19 +1,44 @@
-var state = {
-	race: {
-		
-	},
-	gps: {
-		connected: false,
-		time: 0,
-		lat: 0,
-		lng: 0,
-		accuracy: {
-			time: 0,
-			latm: 0,
-			lngm: 0
-		}
-	},
-	profile: null
+module.exports = {
+  gps: {
+    current: {
+      lat: 0,
+      lng: 0,
+      ts: 0,
+      err: {
+        lat: 0,
+        lng: 0,
+        ts: 0
+      }
+    },
+    previous: {
+      lat: 0,
+      lng: 0,
+      ts: 0,
+      err: {
+        lat: 0,
+        lng: 0,
+        ts: 0
+      }
+    }
+  },
+  race: {
+    begins: 0,
+    average: 0,
+    instant: 0,
+    elapsed: {
+      distance: 0,
+      duration: 0,
+      count: 0
+    },
+    remaining: {
+      distance: 0,
+      duration: 0,
+      offset: 0
+    },
+    target: {
+      speed: 150,
+      distance: 90,
+      duration: 2160000
+    }
+  }
 };
-
-module.exports = state;

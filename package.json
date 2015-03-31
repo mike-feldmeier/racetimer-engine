@@ -1,14 +1,15 @@
 {
-	"name": "racetimer-engine",
-	"description": "",
-	"version": "0.0.1",
-	"private": true,
+  "name": "racetimer-api",
+  "version": "1.0.0",
+  "private": true,
 
-	"dependencies": {
-		"node-gpsd": "latest",
-		"mongoose": "latest",
-		"socket.io": "latest",
-		"moment": "latest",
-		"haversine": "latest"
-	}
+  "dependencies": {
+    "restify": "latest",
+    "socket.io": "latest",
+    "node-gpsd": "latest",
+    "mongoose": "latest",
+
+    "haversine": "latest",
+    "moment": "latest"
+  }
 }

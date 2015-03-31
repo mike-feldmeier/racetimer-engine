@@ -1,127 +1,132 @@
-var LAT_LONG_PLACES = 5;
-var HOUR_IN_MILLISECONDS = 60 * 60 * 1000;
+var HOUR_MILLISECONDS = 60 * 60 * 1000;
+var LATLNG_PLACES = 5;
 
-var mongoose = require('mongoose');
-mongoose.connect('mongodb://localhost/racetimer');
+var events    = require('events');
 
-var gps = require('./gps');
-var state = require('./state');
-var Profile = require('./models/profile');
-
-var moment = require('moment');
 var haversine = require('haversine');
+var moment    = require('moment');
 
-var events = require('events');
+var gps       = require('./gps');
+var state     = require('./state');
+
 var eventEmitter = new events.EventEmitter();
 
-gps.on('connected', function(data) {
-	state.gps.connected = true;
-	console.log('gps connected');
-	eventEmitter.emit('data', state);
+gps.on('error', function(err) {
+  console.dir(err);
+
+  console.log('Attempting to restart gps connection...');
+  gps.disconnect();
+  gps.connect(function() {
+    gps.watch();
+    console.log('GPS connection restarted.');
+  });
 });
 
-gps.on('disconnected', function(data) {
-	state.gps.connected = false;
-	console.log('gps disconnected');
-	eventEmitter.emit('data', state);
+gps.on('raw', function(raw) {
+  try {
+    var message = JSON.parse(raw);
+
+    if(message.class === 'TPV') {
+      var tpv = {
+        lat:  message.lat,
+        lon:  message.lon,
+        time: message.time,
+        ept:  message.ept,
+        epx:  message.epx,
+        epy:  message.epy,
+      };
+
+      if(!isDuplicate(tpv)) {
+        updateGps(tpv);
+
+        if(state.race.begins > 0 && state.gps.current.ts >= state.race.begins) {
+          updateTrack();
+        }
+
+        console.log(state);
+        eventEmitter.emit('state', state);
+      }
+    }
+  }
+  catch(err) {
+    console.dir(err);
+  }
 });
 
-gps.on('TPV', function(data) {
-	if(moment(data.time) - 0 !== state.gps.time) {
-		var lat = parseFloat((data.lat ? data.lat : 0).toFixed(LAT_LONG_PLACES));
-		var lng = parseFloat((data.lon ? data.lon : 0).toFixed(LAT_LONG_PLACES));
+function updateGps(tpv) {
+  state.gps.previous = JSON.parse(JSON.stringify(state.gps.current));
 
-		if(state.race.startsAt) {
-			var now = moment(data.time) - 0;
-			state.race.elapsed = now - state.race.startsAt;
+  if(tpv.lat && tpv.lon && tpv.time) {
+    state.gps.current.lat = parseFloat(tpv.lat.toFixed(LATLNG_PLACES));
+    state.gps.current.lng = parseFloat(tpv.lon.toFixed(LATLNG_PLACES));
+    state.gps.current.ts  = moment(tpv.time).valueOf();
+  }
 
-			if(state.race.elapsed >= 0) {
-				var ddiff = calculateDistance(state.gps.lat, state.gps.lng, lat, lng);
+  if(tpv.epy && tpv.epx && tpv.ept) {
+    state.gps.current.err.lat = parseFloat(tpv.epy.toFixed(LATLNG_PLACES));
+    state.gps.current.err.lng = parseFloat(tpv.epx.toFixed(LATLNG_PLACES));
+    state.gps.current.err.ts  = tpv.ept;
+    }
+}
 
-				state.race.distance += ddiff;
-				state.race.instantSpeed = parseFloat((ddiff / ((now - state.gps.time) / HOUR_IN_MILLISECONDS)).toFixed(3));
-				state.race.instantSum += state.race.instantSpeed;
-				state.race.instantCount++;
-				state.race.averageSpeed = parseFloat((state.race.instantSum / state.race.instantCount).toFixed(3));
-			}
-			else {
-				state.race.instantSum = 0;
-				state.race.instantCount = 0;
-			}
-		}
+function updateTrack() {
+  state.race.elapsed.count++;
 
-		state.gps.time = moment(data.time) - 0;
-		state.gps.lat = lat;
-		state.gps.lng = lng;
-		state.gps.accuracy.time = data.ept;
-		state.gps.accuracy.latm = data.epy;
-		state.gps.accuracy.lngm = data.epx;
+  if(state.gps.previous.ts !== 0) {
+    var deltaD = haversine(
+      { latitude: state.gps.previous.lat, longitude: state.gps.previous.lng },
+      { latitude: state.gps.current.lat, longitude: state.gps.current.lng },
+      { unit: 'mile' }
+    );
+    var deltaT = state.gps.current.ts - state.gps.previous.ts;
 
-		console.log('gps data update');
-		eventEmitter.emit('data', state);
-	}
-});
+    var mph = parseFloat((deltaD / (HOUR_MILLISECONDS / deltaT)).toFixed(3));
+
+    state.race.instant = mph;
+    state.race.average = parseFloat(((state.race.average + mph) / 2).toFixed(3));
+    state.race.elapsed.distance = parseFloat((state.race.elapsed.distance + deltaD).toFixed(3));
+    state.race.elapsed.duration += deltaT;
+
+    // calculate offset
+    state.race.remaining.duration = state.race.target.duration - state.race.elapsed.duration;
+    state.race.remaining.distance = state.race.target.distance - state.race.elapsed.distance;
+    var remainingSpeed = (state.race.remaining.distance / (state.race.remaining.duration / HOUR_MILLISECONDS));
+    state.race.remaining.offset = (remainingSpeed - state.race.instant).toFixed(3);
+  }
+}
+
+function isDuplicate(tpv) {
+  return state.gps.current.ts === moment(tpv.time).valueOf();
+}
 
 function start() {
-	if(!state.race.startsAt) {
-		state.race.startsAt = moment(state.gps.time).add(1, 'minute').startOf('minute') - 0;
-		state.race.distance = 0;
-	}
+  console.log('engine.js (/start)');
+  state.race.begins = moment().add(1, 'minute').seconds(0).milliseconds(0).valueOf();
 }
 
 function stop() {
-	state.race = {};
+  console.log('engine.js (/stop)');  
+  state.race.begins = 0;
+  state.race.elapsed.distance = 0;
+  state.race.elapsed.duration = 0;
+  state.race.elapsed.count = 0;
 }
 
-function listProfiles() {
-	Profile.find({}, function(err, profiles) {
-		if(err) throw err;
-		eventEmitter.emit('profiles', profiles);
-	});
+function setTargetSpeed(speed) {
+  state.race.target.speed = speed;
+  state.race.target.duration = (state.race.target.distance / state.race.target.speed) * 60 * 60 * 1000;
 }
 
-function getProfile(id) {
-	Profile.findById(id, function(err, profile) {
-		if(err) throw err;
-		eventEmitter.emit('profile', profile);
-	});
-}
-
-function selectProfile(id) {
-	Profile.findById(id, function(err, profile) {
-		if(err) throw err;
-		state.profile = profile;
-	});
-}
-
-function saveProfileHeader(header) {
-	var profile = new Profile();
-
-	profile.name = header.name;
-	profile.targetDistanceMiles = header.distance;
-	profile.targetSpeed = header.speed;
-	
-	profile.save(function(err) {
-		if(err) return err;
-		console.log('Saved:');
-		console.dir(profile);
-	});
-}
-
-function calculateDistance(latA, lngA, latB, lngB) {
-	var start = { latitude: latA, longitude: lngA };
-	var stop = { latitude: latB, longitude: lngB };
-	var mi = haversine(start, stop, { unit: 'mi' });
-	return mi;
+function setTargetDistance(distance) {
+  state.race.target.distance = distance;
+  state.race.target.duration = (state.race.target.distance / state.race.target.speed) * 60 * 60 * 1000;
 }
 
 module.exports = {
-	start: start,
-	stop: stop,
-	listProfiles: listProfiles,
-	saveProfileHeader: saveProfileHeader,
-	getProfile: getProfile,
-	selectProfile: selectProfile,
+  start: start,
+  stop: stop,
+  setTargetSpeed: setTargetSpeed,
+  setTargetDistance: setTargetDistance,
 
-	on: function(key, f) { eventEmitter.on(key, f); }
+  on: function(key, f) { eventEmitter.on(key, f); }
 };

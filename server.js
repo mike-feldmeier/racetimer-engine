@@ -1,46 +1,49 @@
-var engine = require('./engine');
+'use strict'
 
-var app = require('http').createServer();
-var io = require('socket.io')(app);
-app.listen(5000);
+var restify   = require('restify');
+var socketio  = require('socket.io');
 
-engine.on('data', function(data) {
-	console.dir(data);
-	io.sockets.emit('data', data);
+var engine    = require('./engine');
+
+var server    = restify.createServer();
+var io        = socketio.listen(server.server);
+
+server.use(restify.bodyParser());
+
+server.get('/start', function(req, res, next) {
+  console.log('server.js (/start)');
+  engine.start();
+  res.send(200);
+  return next();
 });
 
-engine.on('profiles', function(profiles) {
-	console.dir(profiles);
-	io.sockets.emit('profiles', profiles);
+server.get('/stop', function(req, res, next) {
+  console.log('server.js (/stop)');
+  engine.stop();
+  res.send(200);
+  return next();
 });
 
-engine.on('profile', function(profile) {
-	console.dir(profile);
-	io.sockets.emit('profile', profile);
+server.get('/speed/:speed', function(req, res, next) {
+  engine.setTargetSpeed(req.params.speed);
+  res.send(200);
+  return next();
 });
 
-io.on('connection', function(socket) {
-	socket.on('start', function(data) {
-		engine.start();
-	});
+server.get('/distance/:distance', function(req, res, next) {
+  engine.setTargetDistance(req.params.distance);
+  res.send(200);
+  return next();
+});
 
-	socket.on('stop', function(data) {
-		engine.stop();
-	});
+io.sockets.on('connection', function(socket) {
+  socket.emit('connected');
+});
 
-	socket.on('profiles', function(data) {
-		engine.listProfiles();
-	});
+engine.on('state', function(state) {
+  io.sockets.emit('state', state);
+});
 
-	socket.on('profile', function(data) {
-		engine.getProfile(data.id);
-	});
-
-	socket.on('profile-header', function(data) {
-		engine.saveProfileHeader(data);
-	});
-
-	socket.on('select-profile', function(data) {
-		engine.selectProfile(data.id);
-	});
+server.listen(4000, function() {
+  console.log('Server listening at %s', server.url);
 });

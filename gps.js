@@ -1,10 +1,14 @@
 var gpsd = require('node-gpsd');
-var gpsdListener = new gpsd.Listener({
-	port: 2947,
-	hostname: 'localhost'
+
+var listener = new gpsd.Listener({
+  port: 2947,
+  hostname: 'gps',
+  parse: false // true
 });
 
-gpsdListener.connect();
-gpsdListener.watch();
+listener.connect(function() {
+  console.log('gps connected');
+  listener.watch();
+});
 
-module.exports = gpsdListener;
+module.exports = listener;
