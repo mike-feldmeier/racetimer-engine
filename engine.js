@@ -43,7 +43,7 @@ gps.on('raw', function(raw) {
           updateTrack();
         }
 
-        console.log(state);
+        //console.log(state);
         eventEmitter.emit('state', state);
       }
     }
@@ -105,7 +105,7 @@ function start() {
 }
 
 function stop() {
-  console.log('engine.js (/stop)');  
+  console.log('engine.js (/stop)');
   state.race.begins = 0;
   state.race.elapsed.distance = 0;
   state.race.elapsed.duration = 0;
