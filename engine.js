@@ -80,7 +80,7 @@ function updateTrack() {
     );
     var deltaT = state.gps.current.ts - state.gps.previous.ts;
 
-    var mph = parseFloat((deltaD / (HOUR_MILLISECONDS / deltaT)).toFixed(3));
+    var mph = parseFloat((deltaD / (deltaT / HOUR_MILLISECONDS)).toFixed(3));
 
     state.race.instant = mph;
     state.race.average = parseFloat(((state.race.average + mph) / 2).toFixed(3));
