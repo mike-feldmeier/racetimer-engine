@@ -11,18 +11,8 @@ var state     = require('./state');
 
 var eventEmitter = new events.EventEmitter();
 
-gps.on('error', function(err) {
-  console.dir(err);
-
-  console.log('Attempting to restart gps connection...');
-  gps.disconnect();
-  gps.connect(function() {
-    gps.watch();
-    console.log('GPS connection restarted.');
-  });
-});
-
 gps.on('raw', function(raw) {
+  console.log(raw);
   try {
     var message = JSON.parse(raw);
 
